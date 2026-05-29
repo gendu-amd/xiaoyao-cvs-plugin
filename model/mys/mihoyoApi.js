@@ -245,9 +245,9 @@ export default class miHoYoApi {
 				// url:`https://gameapi-account.mihoyo.com/binding/api/genAuthKey`,
 				body: {
 					'auth_appid':data.auth_appid ?? 'webview_gacha',//'apicdkey',// 'webview_gacha',
-					'game_biz': this.isOs ? 'hk4e_global' : 'hk4e_cn',
-					'game_uid': this.e.uid * 1,
-					'region': this.e.region,
+					'game_biz': data.game_biz ?? (this.isOs ? 'hk4e_global' : 'hk4e_cn'),
+					'game_uid': data.game_uid ?? (this.e.uid * 1),
+					'region': data.region ?? this.e.region,
 				},
 				types: 'authKey'
 			},

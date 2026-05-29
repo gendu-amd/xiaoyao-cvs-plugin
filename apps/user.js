@@ -19,8 +19,8 @@ export const rule = {
 		describe: "用户个人信息查询"
 	},
 	gclog: {
-		reg: "^#*(更新|获取|导出)抽卡记录$",
-		describe: "更新抽卡记录"
+		reg: "^(#|\\*)*(星铁|星穹|崩铁)?(更新|获取|导出)抽卡记录$",
+		describe: "更新抽卡记录（原神/星铁）"
 	},
 	gcPaylog: { //避免指令冲突
 		reg: "^#*(刷新|获取|导出)(充值|氪金)记录$",
@@ -149,11 +149,38 @@ export async function gclog(e) {
 		e.reply("请私聊发送")
 		return true;
 	}
-	let authkey = await getAuthKey(e, user)
-	if (!authkey) {
-		return true;
+	// 判断是否为星铁（崩坏：星穹铁道）抽卡记录
+	let isSr = e.isSr || e.game === "sr" || /星铁|星穹|崩铁/.test(e.msg)
+
+	let authkey, url
+	if (isSr) {
+		// 按游戏取星铁UID（与原神UID区分）
+		let srUid = await getGameUid(e, "sr")
+		if (!srUid) {
+			e.reply("未获取到星铁UID，请先绑定星铁UID或对应账号的 cookie/stoken")
+			return true;
+		}
+		let srRegion = getSrServer(srUid)
+		// 通过已绑定的 stoken 自动生成星铁 authkey（game_biz=hkrpg_cn）
+		authkey = await getAuthKey(e, user, {
+			auth_appid: "webview_gacha",
+			game_biz: "hkrpg_cn",
+			game_uid: srUid * 1,
+			region: srRegion
+		})
+		if (!authkey) {
+			return true;
+		}
+		e.uid = srUid
+		e.isSr = true
+		url = `https://public-operation-hkrpg.mihoyo.com/common/gacha_record/api/getGachaLog?authkey_ver=1&sign_type=2&auth_appid=webview_gacha&authkey=${encodeURIComponent(authkey)}&lang=zh-cn&region=${srRegion}&game_biz=hkrpg_cn&gacha_type=11&page=1&size=5&end_id=0`
+	} else {
+		authkey = await getAuthKey(e, user)
+		if (!authkey) {
+			return true;
+		}
+		url = `https://public-operation-hk4e.mihoyo.com/gacha_info/api/getGachaLog?authkey_ver=1&sign_type=2&auth_appid=webview_gacha&init_type=301&gacha_id=fecafa7b6560db5f3182222395d88aaa6aaac1bc&timestamp=${Math.floor(Date.now() / 1000)}&lang=zh-cn&device_type=mobile&plat_type=ios&region=${e.region}&authkey=${encodeURIComponent(authkey)}&game_biz=hk4e_cn&gacha_type=301&page=1&size=5&end_id=0`
 	}
-	let url = `https://public-operation-hk4e.mihoyo.com/gacha_info/api/getGachaLog?authkey_ver=1&sign_type=2&auth_appid=webview_gacha&init_type=301&gacha_id=fecafa7b6560db5f3182222395d88aaa6aaac1bc&timestamp=${Math.floor(Date.now() / 1000)}&lang=zh-cn&device_type=mobile&plat_type=ios&region=${e.region}&authkey=${encodeURIComponent(authkey)}&game_biz=hk4e_cn&gacha_type=301&page=1&size=5&end_id=0`
 	e.msg = url
 	// e.reply(e.msg)
 	let sendMsg = [];
@@ -388,4 +415,35 @@ function getServer(uid) {
 			return 'os_cht' // 港澳台服
 	}
 	return 'cn_gf01'
+}
+
+// 星铁（崩坏：星穹铁道）服务器/region 映射，与原神不同
+function getSrServer(uid) {
+	switch (String(uid)[0]) {
+		case '1':
+		case '2':
+			return 'prod_gf_cn' // 官服
+		case '5':
+			return 'prod_qd_cn' // 渠道服（B服）
+		case '6':
+			return 'prod_official_usa' // 美服
+		case '7':
+			return 'prod_official_euro' // 欧服
+		case '8':
+			return 'prod_official_asia' // 亚服
+		case '9':
+			return 'prod_official_cht' // 港澳台服
+	}
+	return 'prod_gf_cn'
+}
+
+// 按游戏获取已绑定的UID（gs=原神, sr=星铁），依赖框架 e.runtime.user
+async function getGameUid(e, game = "gs") {
+	try {
+		let uid = await e?.runtime?.user?.getUid?.(game)
+		return uid || ""
+	} catch (err) {
+		logger?.debug?.(`[xiaoyao][getGameUid] ${err}`)
+		return ""
+	}
 }
