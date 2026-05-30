@@ -12,6 +12,7 @@ import gsCfg from '../model/gsCfg.js';
 import fs from "fs";
 import YAML from 'yaml'
 import User from "../model/user.js"
+import { getRegion } from "../../genshin/model/games.js"
 
 export const rule = {
 	userInfo: {
@@ -398,43 +399,13 @@ export async function updCookie(e) {
 	return true;
 }
 
+// region 映射统一委托给 genshin 的 Games SSOT（消除重复实现；对真实9位uid等价）
 function getServer(uid) {
-	switch (String(uid)[0]) {
-		case '1':
-		case '2':
-			return 'cn_gf01' // 官服
-		case '5':
-			return 'cn_qd01' // B服
-		case '6':
-			return 'os_usa' // 美服
-		case '7':
-			return 'os_euro' // 欧服
-		case '8':
-			return 'os_asia' // 亚服
-		case '9':
-			return 'os_cht' // 港澳台服
-	}
-	return 'cn_gf01'
+	return getRegion(uid, "gs")
 }
 
-// 星铁（崩坏：星穹铁道）服务器/region 映射，与原神不同
 function getSrServer(uid) {
-	switch (String(uid)[0]) {
-		case '1':
-		case '2':
-			return 'prod_gf_cn' // 官服
-		case '5':
-			return 'prod_qd_cn' // 渠道服（B服）
-		case '6':
-			return 'prod_official_usa' // 美服
-		case '7':
-			return 'prod_official_euro' // 欧服
-		case '8':
-			return 'prod_official_asia' // 亚服
-		case '9':
-			return 'prod_official_cht' // 港澳台服
-	}
-	return 'prod_gf_cn'
+	return getRegion(uid, "sr")
 }
 
 // 按游戏获取已绑定的UID（gs=原神, sr=星铁），依赖框架 e.runtime.user
